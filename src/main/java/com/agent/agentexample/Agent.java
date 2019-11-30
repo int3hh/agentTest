@@ -8,6 +8,7 @@ package com.agent.agentexample;
 import java.io.IOException;
 import java.lang.instrument.Instrumentation;
 import java.lang.reflect.Executable;
+import java.util.concurrent.Callable;
 import net.bytebuddy.agent.builder.AgentBuilder;
 import net.bytebuddy.agent.builder.AgentBuilder.InitializationStrategy;
 import net.bytebuddy.agent.builder.AgentBuilder.Listener;
@@ -19,6 +20,9 @@ import net.bytebuddy.asm.AsmVisitorWrapper;
 import net.bytebuddy.description.type.TypeDescription;
 import net.bytebuddy.dynamic.DynamicType;
 import net.bytebuddy.implementation.FixedValue;
+import net.bytebuddy.implementation.MethodDelegation;
+import net.bytebuddy.implementation.SuperMethodCall;
+import net.bytebuddy.implementation.bind.annotation.SuperCall;
 import net.bytebuddy.matcher.ElementMatchers;
 import static net.bytebuddy.matcher.ElementMatchers.any;
 import static net.bytebuddy.matcher.ElementMatchers.isSynthetic;
@@ -60,7 +64,7 @@ public class Agent {
                         Listener.StreamWriting.toSystemOut()))
                 .type(named("com.tester.jartest.App"))
                 .transform((builder, type, classLoader, module) ->
-                        builder.method(named("withdraw")).intercept(FixedValue.value(true))
+                        builder.method(named("withdraw")).intercept(MethodDelegation.to(TestClass.class))
                 ).installOn(inst);
        
         System.out.println("Injected!");
@@ -100,6 +104,18 @@ public class Agent {
         @Advice.OnMethodExit
         static void onExit(@Advice.Origin final Executable executable) {
             log("exit: " + executable.getName());
+        }
+    }
+    
+    public static class TestClass {
+        static public boolean withdraw(@SuperCall Callable<Boolean> callable) throws Exception {
+            System.out.println("withdraw called!");
+            if (callable.call()){
+                System.out.println("OK");
+            } else{
+                System.out.println("FAIL");
+            }
+            return true;
         }
     }
 
